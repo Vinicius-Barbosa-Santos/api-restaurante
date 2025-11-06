@@ -1,105 +1,98 @@
-import { Request, Response } from "express";
-import { knex } from "../database/knex";
-import z from "zod";
+import { NextFunction, Request, Response } from "express";
+import { knex } from "@/database/knex";
+import { AppError } from "@/utils/AppError";
+import { z } from "zod";
 
-class ProductsController {
-  async create(req: Request, res: Response) {
+class ProductController {
+  async index(request: Request, response: Response, next: NextFunction) {
     try {
-      const bodySchema = z.object({
-        name: z
-          .string()
-          .min(4, "O nome do produto deve ter pelo menos 4 caracteres"),
-        price: z.number().positive(),
-      });
-
-      const { name, price } = bodySchema.parse(req.body);
-
-      await knex<ProductRepository>("products").insert({ name, price });
-
-      return res.status(201).json();
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json(error.issues);
-      }
-    }
-  }
-
-  async index(req: Request, res: Response) {
-    const querySchema = z.object({
-      name: z.string().optional(),
-    });
-
-    try {
-      const { name } = querySchema.parse(req.query);
-      const q = name?.trim();
-
-      if (!q) {
-        const products = await knex<ProductRepository>("products")
-          .select()
-          .orderBy("name");
-
-        return res.status(200).json(products);
-      }
+      const { name } = request.query;
 
       const products = await knex<ProductRepository>("products")
         .select()
-        .whereLike("name", `%${q}%`)
+        .whereLike("name", `%${name ?? ""}%`)
         .orderBy("name");
-
-      return res.status(200).json(products);
+      response.json(products);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json(error.issues);
-      }
+      next(error);
     }
   }
 
-  async update(req: Request, res: Response) {
-    const paramsSchema = z.object({
-      id: z
-        .string()
-        .transform((value) => Number(value))
-        .refine((value) => !isNaN(value), { message: "ID inválido" }),
-    });
-
-    const { id } = paramsSchema.parse(req.params);
-
-    const bodySchema = z.object({
-      name: z
-        .string()
-        .min(4, "O nome do produto deve ter pelo menos 4 caracteres"),
-      price: z.number().positive(),
-    });
-
-    const { name, price } = bodySchema.parse(req.body);
-
-    await knex<ProductRepository>("products")
-      .where({ id })
-      .update({ name, price });
-
-    return res.status(204).json();
-  }
-
-  async delete(req: Request, res: Response) {
+  async create(request: Request, response: Response, next: NextFunction) {
     try {
-      const paramsSchema = z.object({
-        id: z
-          .string()
-          .transform((value) => Number(value))
-          .refine((value) => !isNaN(value), { message: "ID inválido" }),
+      const bodySchema = z.object({
+        name: z.string().trim().min(6),
+        price: z.number().gt(0),
       });
 
-      const { id } = paramsSchema.parse(req.params);
+      const { name, price } = bodySchema.parse(request.body);
 
-      await knex<ProductRepository>("products").where({ id }).delete();
+      await knex<ProductRepository>("products").insert({ name, price });
 
-      return res.status(204).json();
+      response.status(201).json();
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json(error.issues);
+      next(error);
+    }
+  }
+
+  async update(request: Request, response: Response, next: NextFunction) {
+    try {
+      const id = z
+        .string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "id must be a number" })
+        .parse(request.params.id);
+
+      const bodySchema = z.object({
+        name: z.string().trim().min(6),
+        price: z.number().gt(0),
+      });
+
+      const { name, price } = bodySchema.parse(request.body);
+
+      const product = await knex<ProductRepository>("products")
+        .select()
+        .where({ id })
+        .first();
+
+      if (!product) {
+        throw new AppError("product not found");
       }
+
+      await knex<ProductRepository>("products")
+        .update({ name, price, updated_at: knex.fn.now() })
+        .where({ id });
+
+      response.json();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async remove(request: Request, response: Response, next: NextFunction) {
+    try {
+      const id = z
+        .string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "id must be a number" })
+        .parse(request.params.id);
+
+      const product = await knex<ProductRepository>("products")
+        .select()
+        .where({ id })
+        .first();
+
+      if (!product) {
+        throw new AppError("product not found");
+      }
+
+      await knex<ProductRepository>("products").delete().where({ id });
+
+      response.json();
+    } catch (error) {
+      next(error);
     }
   }
 }
 
-export { ProductsController };
+export { ProductController };
