@@ -31,8 +31,9 @@ class ProductsController {
 
     try {
       const { name } = querySchema.parse(req.query);
+      const q = name?.trim();
 
-      if (!name) {
+      if (!q) {
         const products = await knex<ProductRepository>("products")
           .select()
           .orderBy("name");
@@ -42,7 +43,7 @@ class ProductsController {
 
       const products = await knex<ProductRepository>("products")
         .select()
-        .where("name", `%${name}%`)
+        .whereLike("name", `%${q}%`)
         .orderBy("name");
 
       return res.status(200).json(products);
@@ -51,6 +52,32 @@ class ProductsController {
         return res.status(400).json(error.issues);
       }
     }
+  }
+
+  async update(req: Request, res: Response) {
+    const paramsSchema = z.object({
+      id: z
+        .string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "ID inválido" }),
+    });
+
+    const { id } = paramsSchema.parse(req.params);
+
+    const bodySchema = z.object({
+      name: z
+        .string()
+        .min(4, "O nome do produto deve ter pelo menos 4 caracteres"),
+      price: z.number().positive(),
+    });
+
+    const { name, price } = bodySchema.parse(req.body);
+
+    await knex<ProductRepository>("products")
+      .where({ id })
+      .update({ name, price });
+
+    return res.status(204).json();
   }
 
   async delete(req: Request, res: Response) {
