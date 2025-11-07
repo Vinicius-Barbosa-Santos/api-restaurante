@@ -1,11 +1,8 @@
 import { Request, Response } from "express";
 import { knex } from "@/database/knex";
+import z from "zod";
 
 class TablesController {
-  async create(req: Request, res: Response) {
-    return res.status(201).json({ message: "Table created!" });
-  }
-
   async index(req: Request, res: Response) {
     const tables = await knex<TableRepository>("tables")
       .select()
