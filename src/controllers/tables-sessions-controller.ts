@@ -1,10 +1,35 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
+import z from "zod";
+import { knex } from "@/database/knex";
+import { AppError } from "@/utils/AppError";
 
 class TablesSessionsController {
-  async create(req: Request, res: Response) {
-    return res.status(201).json({
-      message: "Table session created successfully",
-    });
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      const bodySchema = z.object({
+        table_id: z.number(),
+      });
+
+      const { table_id } = bodySchema.parse(req.body);
+
+      const session = await knex<TablesSessionsRepository>("tables_sessions")
+        .where({ table_id })
+        .orderBy("opened_at", "desc")
+        .first();
+
+      if (session && !session.closed_at) {
+        throw new AppError("Table already in use");
+      }
+
+      await knex<TablesSessionsRepository>("tables_sessions").insert({
+        table_id,
+        opened_at: knex.fn.now(),
+      });
+
+      return res.status(201).json();
+    } catch (error) {
+      next(error);
+    }
   }
 }
 
