@@ -31,6 +31,18 @@ class TablesSessionsController {
       next(error);
     }
   }
+
+  async index(req: Request, res: Response, next: NextFunction) {
+    try {
+      const sessions = await knex<TablesSessionsRepository>(
+        "tables_sessions"
+      ).orderBy("opened_at", "desc");
+
+      return res.status(200).json(sessions);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export { TablesSessionsController };

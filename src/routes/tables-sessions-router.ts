@@ -6,5 +6,6 @@ const tablesSessionsRouter = Router();
 const tablesSessionsController = new TablesSessionsController();
 
 tablesSessionsRouter.post("/", tablesSessionsController.create);
+tablesSessionsRouter.get("/", tablesSessionsController.index);
 
 export { tablesSessionsRouter };
