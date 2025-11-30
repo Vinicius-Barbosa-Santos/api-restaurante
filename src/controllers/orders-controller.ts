@@ -81,6 +81,28 @@ class OrdersController {
       next(error);
     }
   }
+
+  async show(req: Request, res: Response, next: NextFunction) {
+    try {
+      const table_session_id = z
+        .string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "id must be a number" })
+        .parse(req.params.table_session_id);
+
+      const order = await knex<OrderRepository>("orders")
+        .select(
+          knex.raw("coalesce(sum(orders.price * orders.quantity), 0) as price"),
+          knex.raw("coalesce(sum(orders.quantity), 0) as quantity")
+        )
+        .where({ table_session_id })
+        .first();
+
+      return res.json(order);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export { OrdersController };
